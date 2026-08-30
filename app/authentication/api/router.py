@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Body, HTTPException, Header
-from pydantic import BaseModel
-from hashlib import sha256
 import uuid
+from hashlib import sha256
 
+from fastapi import APIRouter, Body, Header, HTTPException
+from pydantic import BaseModel
 
 router = APIRouter(tags=["authentication"])
 
@@ -23,10 +23,12 @@ class RegisterInput(BaseModel):
     mail: str
     age_of_birth: int
 
+
 class RegisterOutput(BaseModel):
     username: str
     mail: str
     age_of_birth: int
+
 
 @router.post("/register")
 async def register_post(input: RegisterInput = Body()) -> dict[str, RegisterOutput]:
@@ -58,6 +60,7 @@ class LoginInput(BaseModel):
     username: str
     password: str
 
+
 @router.post("/login")
 async def login_post(input: LoginInput = Body()) -> dict[str, str]:
     if input.username not in users:
@@ -79,6 +82,7 @@ class IntrospectOutput(BaseModel):
     username: str
     mail: str
     age_of_birth: int
+
 
 @router.get("/introspect")
 async def introspect_get(auth: str = Header()) -> IntrospectOutput:

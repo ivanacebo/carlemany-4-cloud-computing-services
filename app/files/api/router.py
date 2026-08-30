@@ -1,11 +1,11 @@
-from typing import Optional
-import httpx
-import uuid
-from pypdf import PdfMerger
 import os
+import uuid
+from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException, Body, File, UploadFile
+import httpx
+from fastapi import APIRouter, Body, File, Header, HTTPException, UploadFile
 from pydantic import BaseModel
+from pypdf import PdfMerger
 
 router = APIRouter(tags=["files"])
 
@@ -13,6 +13,7 @@ router = APIRouter(tags=["files"])
 class User(BaseModel):
     username: str
     address: Optional[str] = None
+
 
 class FileBusinesObject(BaseModel):
     id: int
@@ -25,19 +26,15 @@ class FileBusinesObject(BaseModel):
 id_counter = 0
 files_database = {}
 
+
 async def introspect(token: str) -> User:
     url = "http://localhost:80/introspect"
-    headers = {
-        "accept": "application/json",
-        "auth": token
-    }
+    headers = {"accept": "application/json", "auth": token}
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=headers)
     print(response)
     if response.status_code != 200:
-        raise HTTPException(
-            status_code=401, detail="Unauthorized"
-        )
+        raise HTTPException(status_code=401, detail="Unauthorized")
     return User(**response.json())
 
 
@@ -56,7 +53,9 @@ class PostFilesMerge(BaseModel):
 
 
 @router.post("/merge")
-async def merge_files(token: str = Header(alias="auth"), input: PostFilesMerge = Body()) -> dict[str, str]:
+async def merge_files(
+    token: str = Header(alias="auth"), input: PostFilesMerge = Body()
+) -> dict[str, str]:
     user = await introspect(token=token)
     check_file_ownership(input.file_id_1, user)
     file_1 = files_database[input.file_id_1]
@@ -73,19 +72,13 @@ async def merge_files(token: str = Header(alias="auth"), input: PostFilesMerge =
     merged_name = f"files/{file_path_name_1}_{fila_path_name_2}.pdf"
     merger.write(merged_name)
     merger.close()
-    return {
-        "status": "ok"
-    }
+    return {"status": "ok"}
 
 
 @router.get("")
 async def list_files(token: str = Header(alias="auth")) -> list[FileBusinesObject]:
     user = await introspect(token=token)
-    return [
-        file
-        for file in files_database.values()
-        if file.user.username == user.username
-    ]
+    return [file for file in files_database.values() if file.user.username == user.username]
 
 
 class FilesPostInput(BaseModel):
@@ -116,8 +109,11 @@ async def get_file(id: int, token: str = Header(alias="auth")) -> FileBusinesObj
     check_file_ownership(id, user)
     return files_database[id]
 
+
 @router.post("/{id}")
-async def update_file(id: int, token: str = Header(alias="auth"), file_content: UploadFile = File()) -> dict[str, str]:
+async def update_file(
+    id: int, token: str = Header(alias="auth"), file_content: UploadFile = File()
+) -> dict[str, str]:
     user = await introspect(token=token)
     file = check_file_ownership(id, user)
     filename = str(uuid.uuid4())
@@ -134,5 +130,5 @@ async def delete_file(id: int, token: str = Header(alias="auth")) -> dict[str, s
     user = await introspect(token=token)
     check_file_ownership(id, user)
     os.remove(files_database[id].path)
-    del(files_database[id])
+    del files_database[id]
     return {}
