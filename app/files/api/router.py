@@ -113,7 +113,7 @@ async def create_file(token: str = Header(alias="auth"), input: FilesPostInput =
 @router.get("/{id}")
 async def get_file(id: int, token: str = Header(alias="auth")) -> FileBusinesObject:
     user = await introspect(token=token)
-    file = check_file_ownership(id, user)
+    check_file_ownership(id, user)
     return files_database[id]
 
 @router.post("/{id}")
@@ -132,7 +132,7 @@ async def update_file(id: int, token: str = Header(alias="auth"), file_content: 
 @router.delete("/{id}")
 async def delete_file(id: int, token: str = Header(alias="auth")) -> dict[str, str]:
     user = await introspect(token=token)
-    file = check_file_ownership(id, user)
+    check_file_ownership(id, user)
     os.remove(files_database[id].path)
     del(files_database[id])
     return {}
