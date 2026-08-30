@@ -10,13 +10,13 @@ from app.authentication.domain.bo.user_bo import UserBO
 from app.authentication.domain.controllers.introspect_controller import IntrospectController
 from app.authentication.domain.persistences.exceptions import TokenNotFound, UserNotFoundException
 from app.files.dependency_injection import FilesContainer
+from app.files.domain.bo.file_bo import FileBO
 from app.files.domain.controllers.create_file_controller import CreateFileController
 from app.files.domain.controllers.delete_file_controller import DeleteFileController
 from app.files.domain.controllers.get_file_controller import GetFileController
 from app.files.domain.controllers.list_files_controller import ListFilesController
 from app.files.domain.controllers.merge_files_controller import MergeFilesController
 from app.files.domain.controllers.update_file_controller import UpdateFileController
-from app.files.domain.bo.file_bo import FileBO
 from app.files.domain.persistences.exceptions import (
     FileBONotFoundException,
     FileContentNotUploadedException,
@@ -163,9 +163,7 @@ async def get_file(
     ),
 ) -> FileOutput:
     try:
-        file = await get_file_controller.execute(
-            external_id=id, owner_external_id=user.external_id
-        )
+        file = await get_file_controller.execute(external_id=id, owner_external_id=user.external_id)
     except (FileBONotFoundException, FileOwnershipException):
         raise_not_found()
     return to_output(file)
@@ -210,9 +208,7 @@ async def delete_file(
     ),
 ) -> dict[str, str]:
     try:
-        await delete_file_controller.execute(
-            external_id=id, owner_external_id=user.external_id
-        )
+        await delete_file_controller.execute(external_id=id, owner_external_id=user.external_id)
     except (FileBONotFoundException, FileOwnershipException):
         raise_not_found()
     return {}

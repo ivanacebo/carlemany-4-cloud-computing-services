@@ -2,6 +2,7 @@ fastapi==0.100.1
 python-multipart==0.0.9
 pypdf==4.2.0
 httpx==0.28.1
+redis==5.0.1
 dependency_injector==4.41.0
 pydantic_settings==2.0.0
 tortoise-orm==0.19.3

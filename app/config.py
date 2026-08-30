@@ -21,4 +21,16 @@ DATABASE_URL = "postgres://{}:{}@{}:{}/{}".format(
     postgres_settings.database,
 )
 
+
+class RedisSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="REDIS_")
+
+    host: str
+    port: int
+    db: int
+    token_expiration_time: int
+
+
+redis_settings = RedisSettings()
+
 models = ["app.authentication.models", "aerich.models"]
