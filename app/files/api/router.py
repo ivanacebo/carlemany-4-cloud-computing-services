@@ -7,7 +7,7 @@ import os
 from fastapi import APIRouter, Header, HTTPException, Body, File, UploadFile
 from pydantic import BaseModel
 
-router = APIRouter()
+router = APIRouter(tags=["files"])
 
 
 class User(BaseModel):
@@ -26,7 +26,7 @@ id_counter = 0
 files_database = {}
 
 async def introspect(token: str) -> User:
-    url = "http://localhost:8000/introspect"
+    url = "http://localhost:80/introspect"
     headers = {
         "accept": "application/json",
         "auth": token
@@ -39,37 +39,6 @@ async def introspect(token: str) -> User:
             status_code=401, detail="Unauthorized"
         )
     return User(**response.json())
-
-
-async def introspect_aiohttp(token: str) -> User:
-    url = "http://localhost:8000/introspect"
-    headers = {
-        "accept": "application/json",
-        "auth": token
-    }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers) as response:
-            if response.status != 200:
-                raise HTTPException(status_code=401, detail="Unauthorized")
-            data = await response.json()
-
-    return User(**data)
-
-
-# def introspect_requests(token: str) -> User:
-#     url = "http://localhost:8000/introspect"
-#     headers = {
-#         "accept": "application/json",
-#         "auth": token
-#     }
-#
-#     response = requests.get(url, headers=headers)
-#
-#     if response.status_code != 200:
-#         raise HTTPException(status_code=401, detail="Unauthorized")
-#
-#     return User(**response.json())
 
 
 def check_file_ownership(id: int, user: User):
@@ -87,7 +56,7 @@ class PostFilesMerge(BaseModel):
 
 
 @router.post("/merge")
-async def post_files(token: str = Header(alias="auth"), input: PostFilesMerge = Body()) -> dict[str, str]:
+async def merge_files(token: str = Header(alias="auth"), input: PostFilesMerge = Body()) -> dict[str, str]:
     user = await introspect(token=token)
     check_file_ownership(input.file_id_1, user)
     file_1 = files_database[input.file_id_1]
@@ -110,9 +79,13 @@ async def post_files(token: str = Header(alias="auth"), input: PostFilesMerge = 
 
 
 @router.get("")
-async def get_files(token: str = Header(alias="auth")) -> dict[str, str]:
+async def list_files(token: str = Header(alias="auth")) -> list[FileBusinesObject]:
     user = await introspect(token=token)
-    return {"call": "get_files"}
+    return [
+        file
+        for file in files_database.values()
+        if file.user.username == user.username
+    ]
 
 
 class FilesPostInput(BaseModel):
@@ -121,7 +94,7 @@ class FilesPostInput(BaseModel):
 
 
 @router.post("")
-async def post_files(token: str = Header(alias="auth"), input: FilesPostInput = Body()) -> int:
+async def create_file(token: str = Header(alias="auth"), input: FilesPostInput = Body()) -> int:
     user = await introspect(token=token)
     global id_counter
     current_id = id_counter
@@ -133,18 +106,18 @@ async def post_files(token: str = Header(alias="auth"), input: FilesPostInput = 
         author=input.author,
         path=None,
     )
-    files_database[id_counter] = file
-    return id_counter
+    files_database[current_id] = file
+    return current_id
 
 
 @router.get("/{id}")
-async def get_files_id(id: int, token: str = Header(alias="auth")) -> FileBusinesObject:
+async def get_file(id: int, token: str = Header(alias="auth")) -> FileBusinesObject:
     user = await introspect(token=token)
     file = check_file_ownership(id, user)
     return files_database[id]
 
 @router.post("/{id}")
-async def post_files_id(id: int, token: str = Header(alias="auth"), file_content: UploadFile = File()) -> dict[str, str]:
+async def update_file(id: int, token: str = Header(alias="auth"), file_content: UploadFile = File()) -> dict[str, str]:
     user = await introspect(token=token)
     file = check_file_ownership(id, user)
     filename = str(uuid.uuid4())
@@ -157,7 +130,7 @@ async def post_files_id(id: int, token: str = Header(alias="auth"), file_content
 
 
 @router.delete("/{id}")
-async def post_files_id(id: int, token: str = Header(alias="auth")) -> dict[str, str]:
+async def delete_file(id: int, token: str = Header(alias="auth")) -> dict[str, str]:
     user = await introspect(token=token)
     file = check_file_ownership(id, user)
     os.remove(files_database[id].path)
