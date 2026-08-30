@@ -1,4 +1,8 @@
-version: "3.7"
+x-dev-image: &dev-image
+  build:
+    context: .
+    target: carlemany-backend-dev
+  image: carlemany-backend-dev:latest
 
 services:
   carlemany-backend:
@@ -132,7 +136,7 @@ services:
     entrypoint: sh infra/init_db.sh
 
   black:
-    image: carlemany-backend-base:latest
+    <<: *dev-image
     volumes:
       - type: bind
         source: ./
@@ -140,8 +144,16 @@ services:
         read_only: true
     entrypoint: sh -c "black --config .black --check --diff ."
 
+  format:
+    <<: *dev-image
+    volumes:
+      - type: bind
+        source: ./
+        target: /carlemany-backend
+    entrypoint: sh -c "black --config .black . && ruff check --fix"
+
   test: &test
-    image: carlemany-backend-dev:latest
+    <<: *dev-image
     env_file:
      - .env
     volumes:
