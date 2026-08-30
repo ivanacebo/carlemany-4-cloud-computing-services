@@ -1,57 +1,65 @@
-import uuid
-from hashlib import sha256
+from typing import Optional
 
 from fastapi import APIRouter, Body, Header, HTTPException
 from pydantic import BaseModel
 
+from app.authentication.domain.controllers.introspect_controller import IntrospectController
+from app.authentication.domain.controllers.login_controller import LoginController
+from app.authentication.domain.controllers.logout_controller import LogoutController
+from app.authentication.domain.controllers.register_controller import RegisterController
+from app.authentication.domain.persistences.exceptions import (
+    TokenNotFound,
+    UsernameAlreadyTakenException,
+    UserNotFoundException,
+    WrongPasswordException,
+)
+from app.authentication.persistence.memory.token import TokenMemoryService
+from app.authentication.persistence.memory.user_bo import UserBOMemoryService
+
 router = APIRouter(tags=["authentication"])
 
-users = {}
-tokens = {}
+# --- Temporary composition root. Replaced by the DI container in the next step. ---
+token_persistence = TokenMemoryService()
+user_bo_persistence = UserBOMemoryService()
 
-
-class User(BaseModel):
-    username: str
-    password: bytes
-    mail: str
-    age_of_birth: int
+register_controller = RegisterController(user_bo_persistence=user_bo_persistence)
+login_controller = LoginController(
+    user_bo_persistence=user_bo_persistence, token_persistence=token_persistence
+)
+logout_controller = LogoutController(token_persistence=token_persistence)
+introspect_controller = IntrospectController(
+    token_persistence=token_persistence, user_bo_persistence=user_bo_persistence
+)
 
 
 class RegisterInput(BaseModel):
     username: str
     password: str
     mail: str
-    age_of_birth: int
+    year_of_birth: int
 
 
 class RegisterOutput(BaseModel):
     username: str
     mail: str
-    age_of_birth: int
+    year_of_birth: Optional[int] = None
 
 
 @router.post("/register")
 async def register_post(input: RegisterInput = Body()) -> dict[str, RegisterOutput]:
-    if input.username in users:
+    try:
+        user = await register_controller.execute(
+            username=input.username,
+            password=input.password,
+            mail=input.mail,
+            year_of_birth=input.year_of_birth,
+        )
+    except UsernameAlreadyTakenException:
         raise HTTPException(status_code=409, detail="This username is already taken")
-    hash_password = input.username + input.password
-    print("Hash password (X): " + hash_password)
-    hashed_password = sha256(hash_password.encode()).digest()
-    print("Hashed password (Y): " + str(hashed_password.hex()))
-    # f(X) -> Y
-    # For the same X, we always get the same Y
-    # It's theoretically impossible to go from Y -> X
-    new_user = User(
-        username=input.username,
-        password=hashed_password,
-        mail=input.mail,
-        age_of_birth=input.age_of_birth,
-    )
-    users[input.username] = new_user
     output = RegisterOutput(
-        username=input.username,
-        mail=input.mail,
-        age_of_birth=input.age_of_birth,
+        username=user.username,
+        mail=user.mail,
+        year_of_birth=user.year_of_birth,
     )
     return {"new_user": output}
 
@@ -63,43 +71,38 @@ class LoginInput(BaseModel):
 
 @router.post("/login")
 async def login_post(input: LoginInput = Body()) -> dict[str, str]:
-    if input.username not in users:
+    try:
+        token = await login_controller.execute(username=input.username, password=input.password)
+    except UserNotFoundException:
         raise HTTPException(status_code=404, detail="User not found")
-    hashed_stored_password = users[input.username].password
-    hash_password = input.username + input.password
-    hashed_input_password = sha256(hash_password.encode()).digest()
-    if hashed_stored_password == hashed_input_password:
-        random_id = str(uuid.uuid4())
-        while random_id in tokens:
-            random_id = str(uuid.uuid4())
-        tokens[random_id] = input.username
-        return {"auth": random_id}
-    else:
+    except WrongPasswordException:
         raise HTTPException(status_code=403, detail="Password is not correct")
+    return {"auth": token}
 
 
 class IntrospectOutput(BaseModel):
     username: str
     mail: str
-    age_of_birth: int
+    year_of_birth: Optional[int] = None
 
 
 @router.get("/introspect")
 async def introspect_get(auth: str = Header()) -> IntrospectOutput:
-    if auth not in tokens:
+    try:
+        user = await introspect_controller.execute(auth)
+    except (TokenNotFound, UserNotFoundException):
         raise HTTPException(status_code=403, detail="Forbidden")
-    current_username = tokens[auth]
-    user = users[current_username]
     return IntrospectOutput(
         username=user.username,
         mail=user.mail,
-        age_of_birth=user.age_of_birth,
+        year_of_birth=user.year_of_birth,
     )
 
 
 @router.post("/logout")
 async def logout_post(auth: str = Header()) -> dict[str, str]:
-    if auth not in tokens:
+    try:
+        await logout_controller.execute(auth)
+    except TokenNotFound:
         raise HTTPException(status_code=403, detail="Forbidden")
-    del tokens[auth]
     return {"status": "ok"}
