@@ -33,4 +33,17 @@ class RedisSettings(BaseSettings):
 
 redis_settings = RedisSettings()
 
+
+class MinioSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="MINIO_")
+
+    endpoint: str
+    access_key: str
+    secret_key: str
+    bucket: str
+    secure: bool
+
+
+minio_settings = MinioSettings()
+
 models = ["app.authentication.models", "aerich.models"]

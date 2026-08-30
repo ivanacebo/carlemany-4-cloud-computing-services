@@ -23,3 +23,12 @@ class FileOwnershipException(Exception):
 # reporting a storage failure.
 class FileContentNotUploadedException(Exception):
     pass
+
+
+# Raised when the file storage cannot serve a request at all: it is unreachable, the bucket
+# is not there, or the credentials are refused. Kept apart from FileNotFoundException for
+# the same reason TokenStorageUnavailable is kept apart from TokenNotFound: "the content is
+# not there" and "I cannot tell whether it is there" are different answers, and only the
+# first one is the file's fault. It also keeps the minio exceptions from reaching callers.
+class FileStorageUnavailableException(Exception):
+    pass
