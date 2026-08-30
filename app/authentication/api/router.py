@@ -4,7 +4,7 @@ from hashlib import sha256
 import uuid
 
 
-router = APIRouter()
+router = APIRouter(tags=["authentication"])
 
 users = {}
 tokens = {}
@@ -59,7 +59,7 @@ class LoginInput(BaseModel):
     password: str
 
 @router.post("/login")
-async def healthcheck(input: LoginInput = Body()) -> dict[str, str]:
+async def login_post(input: LoginInput = Body()) -> dict[str, str]:
     if input.username not in users:
         raise HTTPException(status_code=404, detail="User not found")
     hashed_stored_password = users[input.username].password
@@ -93,8 +93,8 @@ async def introspect_get(auth: str = Header()) -> IntrospectOutput:
     )
 
 
-@router.delete("/logout")
-async def healthcheck(auth: str = Header()) -> dict[str, str]:
+@router.post("/logout")
+async def logout_post(auth: str = Header()) -> dict[str, str]:
     if auth not in tokens:
         raise HTTPException(status_code=403, detail="Forbidden")
     del tokens[auth]
