@@ -2,10 +2,15 @@ from fastapi import FastAPI
 from tortoise.contrib.fastapi import register_tortoise
 
 from app.authentication.api.router import router as authentication_router
+from app.authentication.dependency_injection import AuthenticationContainer
 from app.config import DATABASE_URL, models
 from app.files.api.router import router as files_router
 
 app = FastAPI()
+
+# Instantiating the container also wires app.authentication.api.router, so the
+# endpoints receive their controllers.
+app.container = AuthenticationContainer()
 
 
 @app.get("/healthcheck")

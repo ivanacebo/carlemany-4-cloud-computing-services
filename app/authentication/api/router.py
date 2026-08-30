@@ -1,8 +1,10 @@
 from typing import Optional
 
-from fastapi import APIRouter, Body, Header, HTTPException
+from dependency_injector.wiring import Provide, inject
+from fastapi import APIRouter, Body, Depends, Header, HTTPException
 from pydantic import BaseModel
 
+from app.authentication.dependency_injection import AuthenticationContainer
 from app.authentication.domain.controllers.introspect_controller import IntrospectController
 from app.authentication.domain.controllers.login_controller import LoginController
 from app.authentication.domain.controllers.logout_controller import LogoutController
@@ -13,23 +15,8 @@ from app.authentication.domain.persistences.exceptions import (
     UserNotFoundException,
     WrongPasswordException,
 )
-from app.authentication.persistence.memory.token import TokenMemoryService
-from app.authentication.persistence.memory.user_bo import UserBOMemoryService
 
 router = APIRouter(tags=["authentication"])
-
-# --- Temporary composition root. Replaced by the DI container in the next step. ---
-token_persistence = TokenMemoryService()
-user_bo_persistence = UserBOMemoryService()
-
-register_controller = RegisterController(user_bo_persistence=user_bo_persistence)
-login_controller = LoginController(
-    user_bo_persistence=user_bo_persistence, token_persistence=token_persistence
-)
-logout_controller = LogoutController(token_persistence=token_persistence)
-introspect_controller = IntrospectController(
-    token_persistence=token_persistence, user_bo_persistence=user_bo_persistence
-)
 
 
 class RegisterInput(BaseModel):
@@ -46,7 +33,13 @@ class RegisterOutput(BaseModel):
 
 
 @router.post("/register")
-async def register_post(input: RegisterInput = Body()) -> dict[str, RegisterOutput]:
+@inject
+async def register_post(
+    input: RegisterInput = Body(),
+    register_controller: RegisterController = Depends(
+        Provide[AuthenticationContainer.register.register_controller]
+    ),
+) -> dict[str, RegisterOutput]:
     try:
         user = await register_controller.execute(
             username=input.username,
@@ -70,7 +63,13 @@ class LoginInput(BaseModel):
 
 
 @router.post("/login")
-async def login_post(input: LoginInput = Body()) -> dict[str, str]:
+@inject
+async def login_post(
+    input: LoginInput = Body(),
+    login_controller: LoginController = Depends(
+        Provide[AuthenticationContainer.login.login_controller]
+    ),
+) -> dict[str, str]:
     try:
         token = await login_controller.execute(username=input.username, password=input.password)
     except UserNotFoundException:
@@ -87,7 +86,13 @@ class IntrospectOutput(BaseModel):
 
 
 @router.get("/introspect")
-async def introspect_get(auth: str = Header()) -> IntrospectOutput:
+@inject
+async def introspect_get(
+    auth: str = Header(),
+    introspect_controller: IntrospectController = Depends(
+        Provide[AuthenticationContainer.introspect.introspect_controller]
+    ),
+) -> IntrospectOutput:
     try:
         user = await introspect_controller.execute(auth)
     except (TokenNotFound, UserNotFoundException):
@@ -100,7 +105,13 @@ async def introspect_get(auth: str = Header()) -> IntrospectOutput:
 
 
 @router.post("/logout")
-async def logout_post(auth: str = Header()) -> dict[str, str]:
+@inject
+async def logout_post(
+    auth: str = Header(),
+    logout_controller: LogoutController = Depends(
+        Provide[AuthenticationContainer.logout.logout_controller]
+    ),
+) -> dict[str, str]:
     try:
         await logout_controller.execute(auth)
     except TokenNotFound:
